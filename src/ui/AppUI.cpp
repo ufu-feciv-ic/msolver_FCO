@@ -344,6 +344,69 @@ void AppUI::TriggerWorkerCalculation()
     m_needsRecalculation = false;
 }
 
+void AppUI::TriggerWorkerSizing()
+{
+    if (m_isRunning) return;
+
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+    writer.StartObject();
+
+    writer.Key("mode"); writer.String("sizing");
+
+    writer.Key("polygon");
+    writer.StartArray();
+    for (const auto& v : m_polygonVertices)
+    {
+        writer.StartObject();
+        writer.Key("x"); writer.Double(v.x);
+        writer.Key("y"); writer.Double(v.y);
+        writer.EndObject();
+    }
+    writer.EndArray();
+
+    writer.Key("rebars");
+    writer.StartArray();
+    for (const auto& r : m_rebars)
+    {
+        writer.StartObject();
+        writer.Key("x"); writer.Double(r.x);
+        writer.Key("y"); writer.Double(r.y);
+        writer.Key("diameter"); writer.Double(r.diameter);
+        writer.EndObject();
+    }
+    writer.EndArray();
+
+    writer.Key("fck"); writer.Double(m_fck);
+    writer.Key("gammaC"); writer.Double(m_gammaC);
+    writer.Key("concreteModel"); writer.Int(m_concreteModel);
+
+    writer.Key("fyk"); writer.Double(m_fyk);
+    writer.Key("gammaS"); writer.Double(m_gammaS);
+    writer.Key("Es"); writer.Double(m_Es);
+
+    writer.Key("Nsd"); writer.Double(m_Nsd);
+    writer.Key("Msdx"); writer.Double(m_Msdx);
+    writer.Key("Msdy"); writer.Double(m_Msdy);
+
+    writer.EndObject();
+
+    std::string workerPath = WorkerProcessManager::ResolveWorkerPath("analysis-worker.exe");
+
+    if (!m_processManager.StartWorker(workerPath, sb.GetString()))
+    {
+        m_isRunning = false;
+        m_statusMessage = "Erro ao iniciar worker backend: " + workerPath;
+    }
+    else
+    {
+        m_isRunning = true;
+        m_progress = 0.0f;
+        m_statusMessage = "Dimensionando área de aço necessária As (Bisseção)...";
+    }
+    m_needsRecalculation = false;
+}
+
 void AppUI::RenderHeaderBar()
 {
     float screenWidth = ImGui::GetIO().DisplaySize.x;
@@ -361,7 +424,7 @@ void AppUI::RenderHeaderBar()
 
     ImGui::TextColored(ImVec4(0.00f, 0.75f, 1.00f, 1.00f), "MSOLVER | FCO");
     ImGui::SameLine();
-    ImGui::TextDisabled("v2.0 — Análise de Seções de Concreto Armado");
+    ImGui::TextDisabled("v2.0 — Análise & Dimensionamento de Concreto Armado");
 
     ImGui::SameLine(0.0f, 20.0f);
 
@@ -374,9 +437,9 @@ void AppUI::RenderHeaderBar()
     ImGui::SameLine();
     if (ImGui::Button("Pilar 30x60")) ApplyPresetGeometry(2);
 
-    float rightWidth = 370.0f;
+    float rightWidth = 520.0f;
     float rightPos = screenWidth - rightWidth;
-    if (rightPos > 520.0f) ImGui::SameLine(rightPos);
+    if (rightPos > 480.0f) ImGui::SameLine(rightPos);
     else ImGui::SameLine();
 
     if (ImGui::Checkbox("Cálculo Automático (Live)", &m_autoCalculate))
@@ -396,9 +459,20 @@ void AppUI::RenderHeaderBar()
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.00f, 0.60f, 0.45f, 1.00f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.00f, 0.75f, 0.55f, 1.00f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.00f, 0.85f, 0.65f, 1.00f));
-        if (ImGui::Button("⚡ CALCULAR AGORA", ImVec2(140, 0)))
+        if (ImGui::Button("⚡ VERIFICAR", ImVec2(120, 0)))
         {
             TriggerWorkerCalculation();
+        }
+        ImGui::PopStyleColor(3);
+
+        ImGui::SameLine();
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.12f, 0.45f, 0.80f, 1.00f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.55f, 0.95f, 1.00f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.24f, 0.65f, 1.00f, 1.00f));
+        if (ImGui::Button("🎯 DIMENSIONAR As", ImVec2(140, 0)))
+        {
+            TriggerWorkerSizing();
         }
         ImGui::PopStyleColor(3);
     }
@@ -462,6 +536,35 @@ void AppUI::UpdateAndRender()
                     m_calcInertiaY = doc.HasMember("inertiaY") ? doc["inertiaY"].GetDouble() : 0.0;
                     m_calcFcd = doc.HasMember("fcd") ? doc["fcd"].GetDouble() : 0.0;
                     m_calcFyd = doc.HasMember("fyd") ? doc["fyd"].GetDouble() : 0.0;
+
+                    m_isSizingMode = doc.HasMember("isSizing") ? doc["isSizing"].GetBool() : false;
+                    if (m_isSizingMode)
+                    {
+                        m_calcRequiredSteelArea = doc.HasMember("requiredSteelArea") ? doc["requiredSteelArea"].GetDouble() : 0.0;
+                        m_calcSteelRatioPercent = doc.HasMember("steelRatioPercent") ? doc["steelRatioPercent"].GetDouble() : 0.0;
+                        m_calcOmegaMechanicalRatio = doc.HasMember("omegaMechanicalRatio") ? doc["omegaMechanicalRatio"].GetDouble() : 0.0;
+                        m_calcNuReducedNormal = doc.HasMember("nuReducedNormal") ? doc["nuReducedNormal"].GetDouble() : 0.0;
+                        m_calcMuXReducedMoment = doc.HasMember("muXReducedMoment") ? doc["muXReducedMoment"].GetDouble() : 0.0;
+                        m_calcMuYReducedMoment = doc.HasMember("muYReducedMoment") ? doc["muYReducedMoment"].GetDouble() : 0.0;
+                        m_calcSizingIterations = doc.HasMember("iterationsCount") ? doc["iterationsCount"].GetInt() : 0;
+                    }
+
+                    if (doc.HasMember("rebars") && doc["rebars"].IsArray())
+                    {
+                        m_rebars.clear();
+                        for (const auto& r : doc["rebars"].GetArray())
+                        {
+                            if (r.IsObject() && r.HasMember("x") && r.HasMember("y") && r.HasMember("diameter"))
+                            {
+                                UIRebarBar bar;
+                                bar.x = static_cast<float>(r["x"].GetDouble());
+                                bar.y = static_cast<float>(r["y"].GetDouble());
+                                bar.diameter = static_cast<float>(r["diameter"].GetDouble());
+                                m_rebars.push_back(bar);
+                            }
+                        }
+                        UpdatePlotGeometry();
+                    }
 
                     m_envelopeMrdX.clear();
                     m_envelopeMrdY.clear();
@@ -766,7 +869,20 @@ void AppUI::RenderPlotPanel()
 
     if (m_hasResults)
     {
-        if (m_isSafe)
+        if (m_isSizingMode)
+        {
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.08f, 0.22f, 0.32f, 0.95f));
+            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.00f, 0.75f, 1.00f, 0.85f));
+            ImGui::BeginChild("SizingBanner", ImVec2(-1, 62.0f), true);
+            ImGui::TextColored(ImVec4(0.20f, 0.85f, 1.00f, 1.00f),
+                "🎯 DIMENSIONAMENTO DE ARMADURA CONCLUÍDO: As,req = %.2f cm² (ω = %.3f)",
+                m_calcRequiredSteelArea, m_calcOmegaMechanicalRatio);
+            ImGui::TextDisabled("Parâmetros Reduzidos (Ábacos): ν = %.3f | μx = %.3f | μy = %.3f | Taxa ρ = %.2f%% | %d Iterações",
+                m_calcNuReducedNormal, m_calcMuXReducedMoment, m_calcMuYReducedMoment, m_calcSteelRatioPercent, m_calcSizingIterations);
+            ImGui::EndChild();
+            ImGui::PopStyleColor(2);
+        }
+        else if (m_isSafe)
         {
             ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.08f, 0.24f, 0.14f, 0.90f));
             ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.12f, 0.82f, 0.45f, 0.80f));

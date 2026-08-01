@@ -3,6 +3,7 @@
 void TestProtocolFraming();
 void TestProtocolCorruptedFrame();
 void TestSimulationEngineExecution();
+void TestSteelSizingExecution();
 
 int main()
 {
@@ -15,9 +16,10 @@ int main()
         TestProtocolFraming();
         TestProtocolCorruptedFrame();
         TestSimulationEngineExecution();
+        TestSteelSizingExecution();
 
         std::cout << "========================================" << std::endl;
-        std::cout << " ALL TESTS PASSED SUCCESSFULLY! (3/3) " << std::endl;
+        std::cout << " ALL TESTS PASSED SUCCESSFULLY! (4/4) " << std::endl;
         std::cout << "========================================" << std::endl;
         return 0;
     }

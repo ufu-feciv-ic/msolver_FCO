@@ -95,30 +95,44 @@ int main()
                     if (doc.HasMember("Msdy") && doc["Msdy"].IsDouble()) input.Msdy = doc["Msdy"].GetDouble();
                 }
 
-                SimulationEngine engine;
-                SimulationEngine::SimulationResult result = engine.RunSimulation(
-                    input,
-                    [](float progress, const std::string& status)
-                    {
-                        rapidjson::StringBuffer sb;
-                        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
-                        writer.StartObject();
-                        writer.Key("progress");
-                        writer.Double(progress);
-                        writer.Key("status");
-                        writer.String(status.c_str());
-                        writer.EndObject();
+                bool isSizingMode = (doc.HasMember("mode") && doc["mode"].IsString() && std::string(doc["mode"].GetString()) == "sizing");
 
-                        SendFrame(WorkerProtocol::MessageType::ProgressUpdate, sb.GetString());
-                    }
-                );
+                SimulationEngine engine;
+                auto progressCallback = [](float progress, const std::string& status)
+                {
+                    rapidjson::StringBuffer sb;
+                    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+                    writer.StartObject();
+                    writer.Key("progress");
+                    writer.Double(progress);
+                    writer.Key("status");
+                    writer.String(status.c_str());
+                    writer.EndObject();
+
+                    SendFrame(WorkerProtocol::MessageType::ProgressUpdate, sb.GetString());
+                };
+
+                SimulationEngine::SimulationResult result;
+                SimulationEngine::SizingResult sizingResult;
+
+                if (isSizingMode)
+                {
+                    sizingResult = engine.RunSizingSimulation(input, progressCallback);
+                    result = sizingResult.verificationResult;
+                    result.message = sizingResult.message;
+                    result.executionTimeMs = sizingResult.executionTimeMs;
+                }
+                else
+                {
+                    result = engine.RunSimulation(input, progressCallback);
+                }
 
                 // Serializar resultado final
                 rapidjson::StringBuffer sb;
                 rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
                 writer.StartObject();
                 writer.Key("success");
-                writer.Bool(result.success);
+                writer.Bool(isSizingMode ? sizingResult.success : result.success);
                 writer.Key("executionTimeMs");
                 writer.Double(result.executionTimeMs);
                 writer.Key("message");
@@ -151,6 +165,26 @@ int main()
                 writer.Key("Msdy");
                 writer.Double(result.Msdy);
 
+                if (isSizingMode)
+                {
+                    writer.Key("isSizing");
+                    writer.Bool(true);
+                    writer.Key("requiredSteelArea");
+                    writer.Double(sizingResult.requiredSteelArea);
+                    writer.Key("steelRatioPercent");
+                    writer.Double(sizingResult.steelRatioPercent);
+                    writer.Key("omegaMechanicalRatio");
+                    writer.Double(sizingResult.omegaMechanicalRatio);
+                    writer.Key("nuReducedNormal");
+                    writer.Double(sizingResult.nuReducedNormal);
+                    writer.Key("muXReducedMoment");
+                    writer.Double(sizingResult.muXReducedMoment);
+                    writer.Key("muYReducedMoment");
+                    writer.Double(sizingResult.muYReducedMoment);
+                    writer.Key("iterationsCount");
+                    writer.Int(sizingResult.iterationsCount);
+                }
+
                 writer.Key("envelopeMoments");
                 writer.StartArray();
                 for (const auto& pt : result.envelopeMoments)
@@ -179,7 +213,8 @@ int main()
 
                 writer.Key("rebars");
                 writer.StartArray();
-                for (const auto& r : result.rebars)
+                const auto& rebarList = isSizingMode ? sizingResult.sizedRebars : result.rebars;
+                for (const auto& r : rebarList)
                 {
                     writer.StartObject();
                     writer.Key("x");

@@ -108,6 +108,18 @@ private:
     double m_calcFcd = 0.0;
     double m_calcFyd = 0.0;
 
+    // Resultados do Solver de Dimensionamento de Armadura
+    bool m_isSizingMode = false;
+    double m_calcRequiredSteelArea = 0.0;      // cm²
+    double m_calcSteelRatioPercent = 0.0;      // %
+    double m_calcOmegaMechanicalRatio = 0.0;   // ω
+    double m_calcNuReducedNormal = 0.0;       // ν
+    double m_calcMuXReducedMoment = 0.0;      // μx
+    double m_calcMuYReducedMoment = 0.0;      // μy
+    int m_calcSizingIterations = 0;
+
+    void TriggerWorkerSizing();
+
     // Curva Envoltória de Momentos (ImPlot)
     std::vector<float> m_envelopeMrdX;
     std::vector<float> m_envelopeMrdY;

@@ -73,7 +73,30 @@ public:
         std::vector<RebarBarInput> rebars;
     };
 
+    struct SizingResult
+    {
+        bool success = false;
+        double executionTimeMs = 0.0;
+        std::string message;
+
+        double initialSteelArea = 0.0;      // cm²
+        double requiredSteelArea = 0.0;     // cm² (As,req)
+        double steelRatioPercent = 0.0;     // 100 * As,req / Ac (%)
+        double omegaMechanicalRatio = 0.0;  // ω = (As,req * fyd) / (Ac * fcd)
+        double scaleFactor = 1.0;
+        int iterationsCount = 0;
+
+        // Variáveis adimensionais reduzidas para comparação direta com ábacos (Venturini/Martha/Montoya)
+        double nuReducedNormal = 0.0;      // ν = Nsd / (Ac * fcd)
+        double muXReducedMoment = 0.0;     // μx = Msdx / (Ac * h_x * fcd)
+        double muYReducedMoment = 0.0;     // μy = Msdy / (Ac * h_y * fcd)
+
+        std::vector<RebarBarInput> sizedRebars;
+        SimulationResult verificationResult;
+    };
+
     using ProgressCallback = std::function<void(float progress, const std::string& status)>;
 
     SimulationResult RunSimulation(const SimulationInput& input, ProgressCallback onProgress);
+    SizingResult RunSizingSimulation(const SimulationInput& input, ProgressCallback onProgress);
 };
