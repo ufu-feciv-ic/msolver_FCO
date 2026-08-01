@@ -5,6 +5,8 @@
 
 #include "ipc/WorkerProcessManager.h"
 #include "engine/Point.h"
+#include "engine/ConcreteProperties.h"
+#include "engine/SteelProperties.h"
 
 struct UIRebarBar
 {
@@ -30,6 +32,9 @@ public:
 private:
     void RenderControlPanel();
     void RenderPlotPanel();
+    void RenderConstitutiveTab();
+    void RenderConcreteConstitutivePlot(float plotWidth = -1.0f, float plotHeight = -1.0f);
+    void RenderSteelConstitutivePlot(float plotWidth = -1.0f, float plotHeight = -1.0f);
     void GeneratePresetGeometry();
     void UpdatePlotGeometry();
 

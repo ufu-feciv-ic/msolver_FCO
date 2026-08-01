@@ -67,6 +67,9 @@ GUI_SRCS := $(SRC_DIR)/main.cpp \
             $(SRC_DIR)/ui/AppUI.cpp \
             $(SRC_DIR)/ipc/WorkerProcessManager.cpp \
             $(SRC_DIR)/protocol/WorkerProtocol.cpp \
+            $(WORKER_DIR)/engine/ConcreteProperties.cpp \
+            $(WORKER_DIR)/engine/SteelProperties.cpp \
+            $(WORKER_DIR)/engine/Point.cpp \
             $(EXTERNAL_DIR)/imgui/imgui.cpp \
             $(EXTERNAL_DIR)/imgui/imgui_draw.cpp \
             $(EXTERNAL_DIR)/imgui/imgui_tables.cpp \

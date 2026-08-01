@@ -333,11 +333,23 @@ void AppUI::RenderControlPanel()
         const char* cModels[] = { "ABNT NBR 6118:2014", "ABNT NBR 6118:2023" };
         ImGui::Combo("Modelo Concreto", &m_concreteModel, cModels, 2);
 
+        if (ImGui::TreeNode("Pré-visualização Gráfico Concreto (σc x εc)"))
+        {
+            RenderConcreteConstitutivePlot(-1.0f, 180.0f);
+            ImGui::TreePop();
+        }
+
         ImGui::Spacing();
         ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.2f, 1.0f), "Aço Passivo:");
         ImGui::SliderFloat("fyk (MPa)", &m_fyk, 250.0f, 600.0f, "%.0f MPa");
         ImGui::SliderFloat("γs (Aço)", &m_gammaS, 1.0f, 2.0f, "%.2f");
         ImGui::SliderFloat("Es (GPa)", &m_Es, 150.0f, 250.0f, "%.0f GPa");
+
+        if (ImGui::TreeNode("Pré-visualização Gráfico Aço (σs x εs)"))
+        {
+            RenderSteelConstitutivePlot(-1.0f, 180.0f);
+            ImGui::TreePop();
+        }
     }
 
     // 4. Solicitação (Esforços Solicitantes)
@@ -530,7 +542,16 @@ void AppUI::RenderPlotPanel()
         }
 
         // -------------------------------------------------------------
-        // ABA 3: Relatório Numérico e Propriedades da Seção
+        // ABA 3: Relações Constitutivas (Concreto & Aço)
+        // -------------------------------------------------------------
+        if (ImGui::BeginTabItem("Relações Constitutivas (Concreto & Aço)"))
+        {
+            RenderConstitutiveTab();
+            ImGui::EndTabItem();
+        }
+
+        // -------------------------------------------------------------
+        // ABA 4: Relatório Numérico e Propriedades da Seção
         // -------------------------------------------------------------
         if (ImGui::BeginTabItem("Relatório & Propriedades Numéricas"))
         {
@@ -597,4 +618,384 @@ void AppUI::RenderPlotPanel()
 
     ImGui::End();
 }
+
+void AppUI::RenderConcreteConstitutivePlot(float plotWidth, float plotHeight)
+{
+    ConcreteProperties concrete;
+    StressStrainConcreteModelType modelType = (m_concreteModel == 0) ?
+        StressStrainConcreteModelType::PARABOLA_RECTANGLE_NBR6118_2014 :
+        StressStrainConcreteModelType::PARABOLA_RECTANGLE_NBR6118_2023;
+
+    concrete.setParameters(modelType, static_cast<double>(m_fck), static_cast<double>(m_gammaC));
+
+    double fck = concrete.getFck();
+    double fcd = concrete.getFcd();
+    double ec2 = concrete.getStrainConcretePlastic();
+    double ecu = concrete.getStrainConcreteRupture();
+    double exponent = concrete.getStressStrainExponent();
+    double factorMult = concrete.getFactorMultiplierFcd();
+    double sigCMaxDesign = factorMult * fcd;
+
+    int numPoints = 120;
+    float maxStrainPlot = static_cast<float>(ecu * 1.15);
+
+    std::vector<float> strainDesign;
+    std::vector<float> stressDesign;
+    std::vector<float> strainChar;
+    std::vector<float> stressChar;
+
+    for (int i = 0; i <= numPoints; ++i)
+    {
+        float eps = (maxStrainPlot * i) / numPoints;
+        strainDesign.push_back(eps);
+
+        if (eps <= ecu)
+        {
+            double s = concrete.computeStress(-eps);
+            stressDesign.push_back(static_cast<float>(s));
+        }
+        else
+        {
+            stressDesign.push_back(0.0f);
+        }
+
+        strainChar.push_back(eps);
+        if (eps <= ec2)
+        {
+            double s = fck * (1.0 - std::pow(1.0 - (eps / ec2), exponent));
+            stressChar.push_back(static_cast<float>(s));
+        }
+        else if (eps <= ecu)
+        {
+            stressChar.push_back(static_cast<float>(fck));
+        }
+        else
+        {
+            stressChar.push_back(0.0f);
+        }
+    }
+
+    float ec2MarkerX = static_cast<float>(ec2);
+    float ec2MarkerY = static_cast<float>(sigCMaxDesign);
+    float ecuMarkerX = static_cast<float>(ecu);
+    float ecuMarkerY = static_cast<float>(sigCMaxDesign);
+
+    float markerX[2] = { ec2MarkerX, ecuMarkerX };
+    float markerY[2] = { ec2MarkerY, ecuMarkerY };
+
+    if (ImPlot::BeginPlot("Diagrama Parábola-Retângulo do Concreto", ImVec2(plotWidth, plotHeight)))
+    {
+        ImPlot::SetupAxes("Deformação de Compressão εc (‰)", "Tensão no Concreto σc (MPa)");
+
+        // Curva Característica (fck)
+        ImPlot::SetNextLineStyle(ImVec4(0.5f, 0.5f, 0.9f, 0.7f), 1.5f);
+        ImPlot::PlotLine("Curva Característica σck", strainChar.data(), stressChar.data(), static_cast<int>(strainChar.size()));
+
+        // Curva de Cálculo (σcd)
+        ImPlot::SetNextLineStyle(ImVec4(0.2f, 0.75f, 1.0f, 1.0f), 2.5f);
+        ImPlot::PlotLine("Curva de Cálculo σcd", strainDesign.data(), stressDesign.data(), static_cast<int>(strainDesign.size()));
+
+        // Marcadores de Pontos Notáveis
+        ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 7.0f, ImVec4(1.0f, 0.3f, 0.2f, 1.0f), 2.0f);
+        ImPlot::PlotScatter("Pontos Notáveis (εc2, εcu)", markerX, markerY, 2);
+
+        // Linhas de Referência
+        float refEps2X[2] = { ec2MarkerX, ec2MarkerX };
+        float refEps2Y[2] = { 0.0f, static_cast<float>(fck * 1.05) };
+        ImPlot::SetNextLineStyle(ImVec4(0.7f, 0.7f, 0.7f, 0.35f), 1.0f);
+        ImPlot::PlotLine("##ref_ec2", refEps2X, refEps2Y, 2);
+
+        float refEpsUX[2] = { ecuMarkerX, ecuMarkerX };
+        float refEpsUY[2] = { 0.0f, static_cast<float>(fck * 1.05) };
+        ImPlot::SetNextLineStyle(ImVec4(0.7f, 0.7f, 0.7f, 0.35f), 1.0f);
+        ImPlot::PlotLine("##ref_ecu", refEpsUX, refEpsUY, 2);
+
+        float refSigMaxX[2] = { 0.0f, maxStrainPlot };
+        float refSigMaxY[2] = { ec2MarkerY, ec2MarkerY };
+        ImPlot::SetNextLineStyle(ImVec4(0.2f, 0.75f, 1.0f, 0.35f), 1.0f);
+        ImPlot::PlotLine("##ref_sigmax", refSigMaxX, refSigMaxY, 2);
+
+        ImPlot::EndPlot();
+    }
+}
+
+void AppUI::RenderSteelConstitutivePlot(float plotWidth, float plotHeight)
+{
+    SteelProperties steel;
+    steel.setParameters(StressStrainSteelModelType::PASSIVE_REINFORCEMENT, static_cast<double>(m_fyk), static_cast<double>(m_gammaS), static_cast<double>(m_Es));
+
+    double fyk = steel.getFyk();
+    double fyd = steel.getFyd();
+    double Es = steel.getE(); // GPa
+    double esy = steel.getStrainSteelYield(); // ‰
+    double esu = steel.getStrainSteelRupture(); // ‰ (10)
+    double esk = fyk / Es; // ‰
+
+    int numPoints = 140;
+    float maxStrain = static_cast<float>(esu * 1.2);
+
+    std::vector<float> strainDesign;
+    std::vector<float> stressDesign;
+    std::vector<float> strainChar;
+    std::vector<float> stressChar;
+
+    for (int i = 0; i <= numPoints; ++i)
+    {
+        float eps = -maxStrain + (2.0f * maxStrain * i) / numPoints;
+
+        strainDesign.push_back(eps);
+        stressDesign.push_back(static_cast<float>(steel.computeStress(eps)));
+
+        strainChar.push_back(eps);
+        if (eps < -esu || eps > esu)
+        {
+            stressChar.push_back(0.0f);
+        }
+        else if (eps <= -esk)
+        {
+            stressChar.push_back(static_cast<float>(-fyk));
+        }
+        else if (eps >= esk)
+        {
+            stressChar.push_back(static_cast<float>(fyk));
+        }
+        else
+        {
+            stressChar.push_back(static_cast<float>(Es * eps));
+        }
+    }
+
+    float markerX[4] = {
+        static_cast<float>(-esu),
+        static_cast<float>(-esy),
+        static_cast<float>(esy),
+        static_cast<float>(esu)
+    };
+    float markerY[4] = {
+        static_cast<float>(-fyd),
+        static_cast<float>(-fyd),
+        static_cast<float>(fyd),
+        static_cast<float>(fyd)
+    };
+
+    if (ImPlot::BeginPlot("Diagrama Tensão-Deformação do Aço", ImVec2(plotWidth, plotHeight)))
+    {
+        ImPlot::SetupAxes("Deformação do Aço εs (‰)", "Tensão no Aço σs (MPa)");
+
+        // Curva Característica (fyk)
+        ImPlot::SetNextLineStyle(ImVec4(0.9f, 0.6f, 0.2f, 0.6f), 1.5f);
+        ImPlot::PlotLine("Curva Característica σsk", strainChar.data(), stressChar.data(), static_cast<int>(strainChar.size()));
+
+        // Curva de Cálculo (fyd)
+        ImPlot::SetNextLineStyle(ImVec4(1.0f, 0.4f, 0.1f, 1.0f), 2.5f);
+        ImPlot::PlotLine("Curva de Cálculo σsd", strainDesign.data(), stressDesign.data(), static_cast<int>(strainDesign.size()));
+
+        // Marcadores de Escoamento e Ruptura
+        ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 7.0f, ImVec4(0.2f, 0.9f, 0.3f, 1.0f), 2.0f);
+        ImPlot::PlotScatter("Escoamento / Ruptura (εsy, εsu)", markerX, markerY, 4);
+
+        // Linhas de Referência
+        float refFydX[2] = { -maxStrain, maxStrain };
+        float refFydYPos[2] = { static_cast<float>(fyd), static_cast<float>(fyd) };
+        float refFydYNeg[2] = { static_cast<float>(-fyd), static_cast<float>(-fyd) };
+
+        ImPlot::SetNextLineStyle(ImVec4(1.0f, 0.4f, 0.1f, 0.35f), 1.0f);
+        ImPlot::PlotLine("##ref_fyd_pos", refFydX, refFydYPos, 2);
+        ImPlot::SetNextLineStyle(ImVec4(1.0f, 0.4f, 0.1f, 0.35f), 1.0f);
+        ImPlot::PlotLine("##ref_fyd_neg", refFydX, refFydYNeg, 2);
+
+        float refEsyXPos[2] = { static_cast<float>(esy), static_cast<float>(esy) };
+        float refEsyXNeg[2] = { static_cast<float>(-esy), static_cast<float>(-esy) };
+        float refEsyY[2] = { static_cast<float>(-fyk * 1.1), static_cast<float>(fyk * 1.1) };
+
+        ImPlot::SetNextLineStyle(ImVec4(0.7f, 0.7f, 0.7f, 0.35f), 1.0f);
+        ImPlot::PlotLine("##ref_esy_pos", refEsyXPos, refEsyY, 2);
+        ImPlot::SetNextLineStyle(ImVec4(0.7f, 0.7f, 0.7f, 0.35f), 1.0f);
+        ImPlot::PlotLine("##ref_esy_neg", refEsyXNeg, refEsyY, 2);
+
+        ImPlot::EndPlot();
+    }
+}
+
+void AppUI::RenderConstitutiveTab()
+{
+    if (ImGui::BeginTabBar("ConstitutiveSubTabs"))
+    {
+        if (ImGui::BeginTabItem("Concreto Armado (NBR 6118)"))
+        {
+            ConcreteProperties concrete;
+            StressStrainConcreteModelType modelType = (m_concreteModel == 0) ?
+                StressStrainConcreteModelType::PARABOLA_RECTANGLE_NBR6118_2014 :
+                StressStrainConcreteModelType::PARABOLA_RECTANGLE_NBR6118_2023;
+
+            concrete.setParameters(modelType, static_cast<double>(m_fck), static_cast<double>(m_gammaC));
+
+            ImGui::Spacing();
+            ImGui::TextColored(ImVec4(0.2f, 0.85f, 1.0f, 1.0f), "Parâmetros Constitutivos do Concreto");
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            if (ImGui::BeginTable("ConcreteParamsTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+            {
+                ImGui::TableSetupColumn("Parâmetro");
+                ImGui::TableSetupColumn("Símbolo");
+                ImGui::TableSetupColumn("Valor");
+                ImGui::TableSetupColumn("Descrição / Norma");
+                ImGui::TableHeadersRow();
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("Modelo Normativo");
+                ImGui::TableSetColumnIndex(1); ImGui::Text("Norma");
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%s", m_concreteModel == 0 ? "NBR 6118:2014" : "NBR 6118:2023");
+                ImGui::TableSetColumnIndex(3); ImGui::Text("Diagrama Parábola-Retângulo");
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("Resistência Característica");
+                ImGui::TableSetColumnIndex(1); ImGui::Text("fck");
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.1f MPa", concrete.getFck());
+                ImGui::TableSetColumnIndex(3); ImGui::Text("Resistência característica à compressão");
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("Coeficiente de Minoracão");
+                ImGui::TableSetColumnIndex(1); ImGui::Text("γc");
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.2f", concrete.getGammaC());
+                ImGui::TableSetColumnIndex(3); ImGui::Text("Coeficiente parcial de segurança do concreto");
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("Resistência de Cálculo");
+                ImGui::TableSetColumnIndex(1); ImGui::Text("fcd");
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.2f MPa", concrete.getFcd());
+                ImGui::TableSetColumnIndex(3); ImGui::Text("fcd = fck / γc");
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("Fator de Redução");
+                ImGui::TableSetColumnIndex(1); ImGui::Text("η (eta)");
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.4f", concrete.getStrenghtReductionFactor());
+                ImGui::TableSetColumnIndex(3); ImGui::Text("η = 1.0 (fck<=40) ou (40/fck)^(1/3) (fck>40)");
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("Tensão de Pico de Cálculo");
+                ImGui::TableSetColumnIndex(1); ImGui::Text("σc,max");
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.2f MPa", concrete.getFactorMultiplierFcd() * concrete.getFcd());
+                ImGui::TableSetColumnIndex(3); ImGui::Text("0.85 * fcd (2014) ou 0.85 * η * fcd (2023)");
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("Deformação Plástica Inicial");
+                ImGui::TableSetColumnIndex(1); ImGui::Text("εc2");
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.3f ‰", concrete.getStrainConcretePlastic());
+                ImGui::TableSetColumnIndex(3); ImGui::Text("Início do patamar plástico de compressão");
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("Deformação de Ruptura");
+                ImGui::TableSetColumnIndex(1); ImGui::Text("εcu");
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.3f ‰", concrete.getStrainConcreteRupture());
+                ImGui::TableSetColumnIndex(3); ImGui::Text("Limite de encurtamento do concreto");
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("Expoente da Parábola");
+                ImGui::TableSetColumnIndex(1); ImGui::Text("n");
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.2f", concrete.getStressStrainExponent());
+                ImGui::TableSetColumnIndex(3); ImGui::Text("n = 2.0 (fck<=50) ou função de fck (fck>50)");
+
+                ImGui::EndTable();
+            }
+
+            ImGui::Spacing();
+            RenderConcreteConstitutivePlot(-1.0f, 380.0f);
+
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("Aço Passivo (Armaduras)"))
+        {
+            SteelProperties steel;
+            steel.setParameters(StressStrainSteelModelType::PASSIVE_REINFORCEMENT, static_cast<double>(m_fyk), static_cast<double>(m_gammaS), static_cast<double>(m_Es));
+
+            ImGui::Spacing();
+            ImGui::TextColored(ImVec4(0.2f, 0.85f, 1.0f, 1.0f), "Parâmetros Constitutivos do Aço");
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            if (ImGui::BeginTable("SteelParamsTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+            {
+                ImGui::TableSetupColumn("Parâmetro");
+                ImGui::TableSetupColumn("Símbolo");
+                ImGui::TableSetupColumn("Valor");
+                ImGui::TableSetupColumn("Descrição / Norma");
+                ImGui::TableHeadersRow();
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("Resistência Característica ao Escoamento");
+                ImGui::TableSetColumnIndex(1); ImGui::Text("fyk");
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.1f MPa", steel.getFyk());
+                ImGui::TableSetColumnIndex(3); ImGui::Text("Tensão de escoamento característica");
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("Coeficiente de Minoracão");
+                ImGui::TableSetColumnIndex(1); ImGui::Text("γs");
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.2f", steel.getGammaS());
+                ImGui::TableSetColumnIndex(3); ImGui::Text("Coeficiente parcial de segurança do aço");
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("Resistência de Escoamento de Cálculo");
+                ImGui::TableSetColumnIndex(1); ImGui::Text("fyd");
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.2f MPa", steel.getFyd());
+                ImGui::TableSetColumnIndex(3); ImGui::Text("fyd = fyk / γs");
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("Módulo de Elasticidade");
+                ImGui::TableSetColumnIndex(1); ImGui::Text("Es");
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.1f GPa (%.0f MPa)", steel.getE(), steel.getE() * 1000.0);
+                ImGui::TableSetColumnIndex(3); ImGui::Text("Rigidez elástica das barras de aço");
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("Deformação de Escoamento de Cálculo");
+                ImGui::TableSetColumnIndex(1); ImGui::Text("εsy");
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.3f ‰", steel.getStrainSteelYield());
+                ImGui::TableSetColumnIndex(3); ImGui::Text("εsy = fyd / Es");
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("Deformação Limite de Ruptura");
+                ImGui::TableSetColumnIndex(1); ImGui::Text("εsu");
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.1f ‰ (1.0%%)", steel.getStrainSteelRupture());
+                ImGui::TableSetColumnIndex(3); ImGui::Text("Limite normativo de deformação do aço");
+
+                ImGui::EndTable();
+            }
+
+            ImGui::Spacing();
+            RenderSteelConstitutivePlot(-1.0f, 380.0f);
+
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("Visão Comparativa Lado a Lado"))
+        {
+            ImGui::Spacing();
+            ImVec2 avail = ImGui::GetContentRegionAvail();
+            float plotHeight = avail.y - 40.0f;
+            if (plotHeight < 300.0f) plotHeight = 300.0f;
+
+            if (ImGui::BeginTable("SideBySideTable", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV))
+            {
+                ImGui::TableNextRow();
+
+                ImGui::TableSetColumnIndex(0);
+                ImGui::TextColored(ImVec4(0.2f, 0.85f, 1.0f, 1.0f), "Concreto Armado (σc x εc)");
+                RenderConcreteConstitutivePlot(-1.0f, plotHeight);
+
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.2f, 1.0f), "Aço Passivo (σs x εs)");
+                RenderSteelConstitutivePlot(-1.0f, plotHeight);
+
+                ImGui::EndTable();
+            }
+
+            ImGui::EndTabItem();
+        }
+
+        ImGui::EndTabBar();
+    }
+}
+
 

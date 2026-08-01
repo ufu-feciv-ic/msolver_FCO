@@ -46,6 +46,9 @@ add_executable(AppGUI
     src/ui/AppUI.cpp
     src/ipc/WorkerProcessManager.cpp
     src/protocol/WorkerProtocol.cpp
+    worker/engine/ConcreteProperties.cpp
+    worker/engine/SteelProperties.cpp
+    worker/engine/Point.cpp
     external/imgui/imgui.cpp
     external/imgui/imgui_draw.cpp
     external/imgui/imgui_tables.cpp
