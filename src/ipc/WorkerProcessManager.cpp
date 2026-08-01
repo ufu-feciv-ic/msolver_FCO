@@ -5,6 +5,11 @@
 #if !defined(PLATFORM_WEB)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include "engine/SimulationEngine.h"
+#include <rapidjson/document.h>
+#include <rapidjson/writer.h>
+#include <rapidjson/stringbuffer.h>
 #endif
 
 namespace fs = std::filesystem;
@@ -160,6 +165,35 @@ bool WorkerProcessManager::StartWorker(const std::string& workerPath, const std:
     m_stdinWrite = nullptr;
     return true;
 #else
+    rapidjson::Document doc;
+    doc.Parse(jsonInput.c_str());
+    if (!doc.HasParseError() && doc.HasMember("matrixSize") && doc.HasMember("loadFactor"))
+    {
+        SimulationEngine::SimulationInput input;
+        input.matrixSize = doc["matrixSize"].GetInt();
+        input.loadFactor = doc["loadFactor"].GetDouble();
+
+        SimulationEngine engine;
+        auto res = engine.RunSimulation(input, nullptr);
+
+        rapidjson::StringBuffer sb;
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartObject();
+        writer.Key("success"); writer.Bool(res.success);
+        writer.Key("message"); writer.String(res.message.c_str());
+        writer.Key("executionTimeMs"); writer.Double(res.executionTimeMs);
+        writer.Key("solution");
+        writer.StartArray();
+        for (double v : res.solutionVector) writer.Double(v);
+        writer.EndArray();
+        writer.EndObject();
+
+        m_latestResultJson = sb.GetString();
+        m_resultReady = true;
+        m_running = false;
+        return true;
+    }
+    m_running = false;
     return false;
 #endif
 }

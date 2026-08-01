@@ -118,10 +118,13 @@ $(OBJ_TEST_DIR)/%.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDE_PATHS) $(DEFINES) -c $< -o $@
 
 # Web assembly target
-FLAGS_WEB := -Os -Wall -std=c++17 -DPLATFORM_WEB -s USE_GLFW=3 -s ALLOW_MEMORY_GROWTH=1
+RAYLIB_WEB_LIB ?= $(RAYLIB_PATH)/src/libraylib.web.a
+SHELL_HTML    ?= $(RAYLIB_PATH)/src/minshell.html
+
+FLAGS_WEB := -Os -Wall -std=c++17 -DPLATFORM_WEB -s USE_GLFW=3 -s ALLOW_MEMORY_GROWTH=1 --shell-file $(SHELL_HTML)
 web:
 	@if not exist "$(BUILD_DIR_WEB)" mkdir "$(subst /,\,$(BUILD_DIR_WEB))"
-	$(EMCC) $(GUI_SRCS) $(INCLUDE_PATHS) $(FLAGS_WEB) -o $(TARGET_WEB)
+	$(EMCC) $(GUI_SRCS) $(WORKER_DIR)/engine/SimulationEngine.cpp $(INCLUDE_PATHS) $(RAYLIB_WEB_LIB) $(FLAGS_WEB) -o $(TARGET_WEB)
 	@echo [WebAssembly Build Success] $(TARGET_WEB)
 
 serve:

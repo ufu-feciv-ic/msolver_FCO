@@ -4,6 +4,28 @@
 #include "rlImGui.h"
 #include "ui/AppUI.h"
 
+#if defined(PLATFORM_WEB)
+#include <emscripten/emscripten.h>
+#endif
+
+static AppUI* g_appUI = nullptr;
+
+static void UpdateDrawFrame()
+{
+    BeginDrawing();
+    ClearBackground(GetColor(0x181818FF));
+
+    rlImGuiBegin();
+
+    if (g_appUI)
+    {
+        g_appUI->UpdateAndRender();
+    }
+
+    rlImGuiEnd();
+    EndDrawing();
+}
+
 int main()
 {
     // 1. Inicializar Janela Raylib
@@ -17,25 +39,22 @@ int main()
 
     // 3. Instância da Aplicação UI
     AppUI appUI;
+    g_appUI = &appUI;
 
+#if defined(PLATFORM_WEB)
+    emscripten_set_main_loop(UpdateDrawFrame, 0, 1);
+#else
     // Loop Principal
     while (!WindowShouldClose())
     {
-        BeginDrawing();
-        ClearBackground(GetColor(0x181818FF));
-
-        rlImGuiBegin();
-
-        appUI.UpdateAndRender();
-
-        rlImGuiEnd();
-        EndDrawing();
+        UpdateDrawFrame();
     }
 
     // Teardown
     ImPlot::DestroyContext();
     rlImGuiShutdown();
     CloseWindow();
+#endif
 
     return 0;
 }
