@@ -58,10 +58,41 @@ int main()
                 SimulationEngine::SimulationInput input;
                 if (!doc.HasParseError())
                 {
-                    if (doc.HasMember("matrixSize") && doc["matrixSize"].IsInt())
-                        input.matrixSize = doc["matrixSize"].GetInt();
-                    if (doc.HasMember("loadFactor") && doc["loadFactor"].IsDouble())
-                        input.loadFactor = doc["loadFactor"].GetDouble();
+                    if (doc.HasMember("polygon") && doc["polygon"].IsArray())
+                    {
+                        for (const auto& v : doc["polygon"].GetArray())
+                        {
+                            if (v.IsObject() && v.HasMember("x") && v.HasMember("y"))
+                            {
+                                input.polygonVertices.push_back(Point(v["x"].GetDouble(), v["y"].GetDouble()));
+                            }
+                        }
+                    }
+                    if (doc.HasMember("rebars") && doc["rebars"].IsArray())
+                    {
+                        for (const auto& r : doc["rebars"].GetArray())
+                        {
+                            if (r.IsObject() && r.HasMember("x") && r.HasMember("y") && r.HasMember("diameter"))
+                            {
+                                SimulationEngine::RebarBarInput bar;
+                                bar.x = r["x"].GetDouble();
+                                bar.y = r["y"].GetDouble();
+                                bar.diameter = r["diameter"].GetDouble();
+                                input.rebars.push_back(bar);
+                            }
+                        }
+                    }
+                    if (doc.HasMember("fck") && doc["fck"].IsDouble()) input.fck = doc["fck"].GetDouble();
+                    if (doc.HasMember("gammaC") && doc["gammaC"].IsDouble()) input.gammaC = doc["gammaC"].GetDouble();
+                    if (doc.HasMember("concreteModel") && doc["concreteModel"].IsInt()) input.concreteModelType = doc["concreteModel"].GetInt();
+
+                    if (doc.HasMember("fyk") && doc["fyk"].IsDouble()) input.fyk = doc["fyk"].GetDouble();
+                    if (doc.HasMember("gammaS") && doc["gammaS"].IsDouble()) input.gammaS = doc["gammaS"].GetDouble();
+                    if (doc.HasMember("Es") && doc["Es"].IsDouble()) input.Es = doc["Es"].GetDouble();
+
+                    if (doc.HasMember("Nsd") && doc["Nsd"].IsDouble()) input.Nsd = doc["Nsd"].GetDouble();
+                    if (doc.HasMember("Msdx") && doc["Msdx"].IsDouble()) input.Msdx = doc["Msdx"].GetDouble();
+                    if (doc.HasMember("Msdy") && doc["Msdy"].IsDouble()) input.Msdy = doc["Msdy"].GetDouble();
                 }
 
                 SimulationEngine engine;
@@ -92,13 +123,75 @@ int main()
                 writer.Double(result.executionTimeMs);
                 writer.Key("message");
                 writer.String(result.message.c_str());
-                writer.Key("solution");
+
+                writer.Key("isSafe");
+                writer.Bool(result.isSafe);
+                writer.Key("area");
+                writer.Double(result.area);
+                writer.Key("height");
+                writer.Double(result.height);
+                writer.Key("centroidX");
+                writer.Double(result.centroid.getX());
+                writer.Key("centroidY");
+                writer.Double(result.centroid.getY());
+                writer.Key("inertiaX");
+                writer.Double(result.inertiaX);
+                writer.Key("inertiaY");
+                writer.Double(result.inertiaY);
+
+                writer.Key("fcd");
+                writer.Double(result.fcd);
+                writer.Key("fyd");
+                writer.Double(result.fyd);
+
+                writer.Key("Nsd");
+                writer.Double(result.Nsd);
+                writer.Key("Msdx");
+                writer.Double(result.Msdx);
+                writer.Key("Msdy");
+                writer.Double(result.Msdy);
+
+                writer.Key("envelopeMoments");
                 writer.StartArray();
-                for (double val : result.solutionVector)
+                for (const auto& pt : result.envelopeMoments)
                 {
-                    writer.Double(val);
+                    writer.StartObject();
+                    writer.Key("x");
+                    writer.Double(pt.getX());
+                    writer.Key("y");
+                    writer.Double(pt.getY());
+                    writer.EndObject();
                 }
                 writer.EndArray();
+
+                writer.Key("polygon");
+                writer.StartArray();
+                for (const auto& pt : result.polygonVertices)
+                {
+                    writer.StartObject();
+                    writer.Key("x");
+                    writer.Double(pt.getX());
+                    writer.Key("y");
+                    writer.Double(pt.getY());
+                    writer.EndObject();
+                }
+                writer.EndArray();
+
+                writer.Key("rebars");
+                writer.StartArray();
+                for (const auto& r : result.rebars)
+                {
+                    writer.StartObject();
+                    writer.Key("x");
+                    writer.Double(r.x);
+                    writer.Key("y");
+                    writer.Double(r.y);
+                    writer.Key("diameter");
+                    writer.Double(r.diameter);
+                    writer.EndObject();
+                }
+                writer.EndArray();
+
                 writer.EndObject();
 
                 SendFrame(WorkerProtocol::MessageType::JobSucceeded, sb.GetString());

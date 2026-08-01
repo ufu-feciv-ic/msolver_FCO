@@ -5,12 +5,40 @@
 
 void TestSimulationEngineExecution()
 {
-    std::cout << "[TEST] Running TestSimulationEngineExecution..." << std::endl;
+    std::cout << "[TEST] Running TestSimulationEngineExecution (Concrete Cross Section)..." << std::endl;
 
     SimulationEngine engine;
     SimulationEngine::SimulationInput input;
-    input.matrixSize = 5;
-    input.loadFactor = 1.0;
+    
+    // Seção retangular 20x50 cm
+    input.polygonVertices = {
+        Point(-10.0, -25.0),
+        Point( 10.0, -25.0),
+        Point( 10.0,  25.0),
+        Point(-10.0,  25.0)
+    };
+
+    // 4 barras Φ 16mm no fundo, 2 barras Φ 12.5mm no topo
+    input.rebars = {
+        { -7.0, -22.0, 16.0 },
+        { -2.33, -22.0, 16.0 },
+        {  2.33, -22.0, 16.0 },
+        {  7.0, -22.0, 16.0 },
+        { -7.0,  22.0, 12.5 },
+        {  7.0,  22.0, 12.5 }
+    };
+
+    input.fck = 30.0;
+    input.gammaC = 1.4;
+    input.concreteModelType = 1;
+
+    input.fyk = 500.0;
+    input.gammaS = 1.15;
+    input.Es = 210.0;
+
+    input.Nsd = 0.0;
+    input.Msdx = 20.0;
+    input.Msdy = 5.0;
 
     bool progressCalled = false;
     auto onProgress = [&progressCalled](float progress, const std::string& status) {
@@ -22,8 +50,10 @@ void TestSimulationEngineExecution()
     SimulationEngine::SimulationResult result = engine.RunSimulation(input, onProgress);
 
     assert(result.success == true);
-    assert(result.solutionVector.size() == 5);
+    assert(!result.envelopeMoments.empty());
+    assert(result.area > 0.0);
     assert(progressCalled == true);
 
-    std::cout << "[TEST PASSED] TestSimulationEngineExecution" << std::endl;
+    std::cout << "[TEST PASSED] TestSimulationEngineExecution - Envoltória gerada com " 
+              << result.envelopeMoments.size() << " pontos." << std::endl;
 }

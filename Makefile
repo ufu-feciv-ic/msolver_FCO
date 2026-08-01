@@ -52,6 +52,7 @@ INCLUDE_PATHS := -I.
 INCLUDE_PATHS += -I$(SRC_DIR)
 INCLUDE_PATHS += -I$(WORKER_DIR)
 INCLUDE_PATHS += -I$(EXTERNAL_DIR)
+INCLUDE_PATHS += -I$(EXTERNAL_DIR)/cereal/include
 INCLUDE_PATHS += -I$(EXTERNAL_DIR)/imgui
 INCLUDE_PATHS += -I$(EXTERNAL_DIR)/rlimgui
 INCLUDE_PATHS += -I$(EXTERNAL_DIR)/eigen
@@ -74,14 +75,28 @@ GUI_SRCS := $(SRC_DIR)/main.cpp \
             $(EXTERNAL_DIR)/imgui/implot_items.cpp \
             $(EXTERNAL_DIR)/rlimgui/rlImGui.cpp
 
-WORKER_SRCS := $(WORKER_DIR)/main.cpp \
+ENGINE_SRCS := $(WORKER_DIR)/engine/AnalyticalIntegration.cpp \
+               $(WORKER_DIR)/engine/ConcreteProperties.cpp \
+               $(WORKER_DIR)/engine/InternalForces.cpp \
+               $(WORKER_DIR)/engine/MomentSolver.cpp \
+               $(WORKER_DIR)/engine/Point.cpp \
+               $(WORKER_DIR)/engine/Polygon.cpp \
+               $(WORKER_DIR)/engine/PolygonStressRegions.cpp \
+               $(WORKER_DIR)/engine/Reinforcement.cpp \
+               $(WORKER_DIR)/engine/Section.cpp \
                $(WORKER_DIR)/engine/SimulationEngine.cpp \
+               $(WORKER_DIR)/engine/SteelProperties.cpp \
+               $(WORKER_DIR)/engine/StrainDistribution.cpp \
+               $(WORKER_DIR)/engine/combination.cpp
+
+WORKER_SRCS := $(WORKER_DIR)/main.cpp \
+               $(ENGINE_SRCS) \
                $(SRC_DIR)/protocol/WorkerProtocol.cpp
 
 TEST_SRCS := $(TESTS_DIR)/test_runner.cpp \
              $(TESTS_DIR)/test_protocol.cpp \
              $(TESTS_DIR)/test_engine.cpp \
-             $(WORKER_DIR)/engine/SimulationEngine.cpp \
+             $(ENGINE_SRCS) \
              $(SRC_DIR)/protocol/WorkerProtocol.cpp
 
 GUI_OBJS    := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(GUI_SRCS))
@@ -124,7 +139,7 @@ SHELL_HTML    ?= $(RAYLIB_PATH)/src/minshell.html
 FLAGS_WEB := -Os -Wall -std=c++17 -DPLATFORM_WEB -s USE_GLFW=3 -s ALLOW_MEMORY_GROWTH=1 --shell-file $(SHELL_HTML)
 web:
 	@if not exist "$(BUILD_DIR_WEB)" mkdir "$(subst /,\,$(BUILD_DIR_WEB))"
-	$(EMCC) $(GUI_SRCS) $(WORKER_DIR)/engine/SimulationEngine.cpp $(INCLUDE_PATHS) $(RAYLIB_WEB_LIB) $(FLAGS_WEB) -o $(TARGET_WEB)
+	$(EMCC) $(GUI_SRCS) $(ENGINE_SRCS) $(INCLUDE_PATHS) $(RAYLIB_WEB_LIB) $(FLAGS_WEB) -o $(TARGET_WEB)
 	@echo [WebAssembly Build Success] $(TARGET_WEB)
 
 serve:

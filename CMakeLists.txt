@@ -10,16 +10,33 @@ include_directories(
     src/
     worker/
     external/
+    external/cereal/include
     external/imgui
     external/rlimgui
     external/eigen
     ${RAYLIB_PATH}/src
 )
 
+set(ENGINE_SOURCES
+    worker/engine/AnalyticalIntegration.cpp
+    worker/engine/ConcreteProperties.cpp
+    worker/engine/InternalForces.cpp
+    worker/engine/MomentSolver.cpp
+    worker/engine/Point.cpp
+    worker/engine/Polygon.cpp
+    worker/engine/PolygonStressRegions.cpp
+    worker/engine/Reinforcement.cpp
+    worker/engine/Section.cpp
+    worker/engine/SimulationEngine.cpp
+    worker/engine/SteelProperties.cpp
+    worker/engine/StrainDistribution.cpp
+    worker/engine/combination.cpp
+)
+
 # 1. Executável do Motor (Worker Process)
 add_executable(analysis-worker
     worker/main.cpp
-    worker/engine/SimulationEngine.cpp
+    ${ENGINE_SOURCES}
     src/protocol/WorkerProtocol.cpp
 )
 
@@ -52,7 +69,7 @@ add_executable(run_tests
     tests/test_runner.cpp
     tests/test_protocol.cpp
     tests/test_engine.cpp
-    worker/engine/SimulationEngine.cpp
+    ${ENGINE_SOURCES}
     src/protocol/WorkerProtocol.cpp
 )
 
