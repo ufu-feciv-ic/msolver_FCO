@@ -30,6 +30,7 @@ public:
     void UpdateAndRender();
 
 private:
+    void RenderHeaderBar();
     void RenderControlPanel();
     void RenderPlotPanel();
     void RenderConstitutiveTab();
@@ -37,8 +38,17 @@ private:
     void RenderSteelConstitutivePlot(float plotWidth = -1.0f, float plotHeight = -1.0f);
     void GeneratePresetGeometry();
     void UpdatePlotGeometry();
+    void ApplyCustomTheme();
+    void ApplyPresetGeometry(int presetType);
+    void ApplyLoadingPreset(int loadPreset);
+    void TriggerWorkerCalculation();
 
     WorkerProcessManager m_processManager;
+
+    // Estado da Interface & Tema
+    bool m_themeInitialized = false;
+    bool m_autoCalculate = false;
+    bool m_needsRecalculation = false;
 
     // Preset de Geometria: 0 = Retangular, 1 = Seção T, 2 = Polígono Livre
     int m_sectionPreset = 0;
