@@ -1,0 +1,50 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/worker",
+                "${workspaceFolder}/external",
+                "${workspaceFolder}/external/imgui",
+                "${workspaceFolder}/external/rlimgui",
+                "${workspaceFolder}/external/eigen",
+                "C:/raylib/raylib/src",
+                "C:/raylib/raylib/src/external"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "PLATFORM_DESKTOP",
+                "GRAPHICS_API_OPENGL_33"
+            ],
+            "compilerPath": "C:/raylib/raylib/w64devkit/bin/g++.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-gcc-x64"
+        },
+        {
+            "name": "Web",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/worker",
+                "${workspaceFolder}/external",
+                "${workspaceFolder}/external/imgui",
+                "${workspaceFolder}/external/rlimgui",
+                "${workspaceFolder}/external/eigen"
+            ],
+            "defines": [
+                "PLATFORM_WEB",
+                "GRAPHICS_API_OPENGL_ES2"
+            ],
+            "compilerPath": "em++",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}

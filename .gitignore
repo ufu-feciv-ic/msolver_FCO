@@ -1,0 +1,11 @@
+build/
+obj/
+obj_worker/
+obj_tests/
+
+imgui.ini
+
+*.user
+*.suo
+*.tmp
+desktop.ini

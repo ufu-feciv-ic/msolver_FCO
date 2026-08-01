@@ -1,0 +1,106 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build debug",
+            "type": "shell",
+            "command": "mingw32-make",
+            "args": [
+                "BUILD_MODE=DEBUG",
+                "PROJECT_NAME=AppGUI"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "options": {
+                "env": {
+                    "PATH": "C:\\raylib\\w64devkit\\bin;${env:PATH}"
+                }
+            }
+        },
+        {
+            "label": "build release",
+            "type": "shell",
+            "command": "mingw32-make",
+            "args": [
+                "BUILD_MODE=RELEASE",
+                "PROJECT_NAME=AppGUI"
+            ],
+            "group": "build",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "options": {
+                "env": {
+                    "PATH": "C:\\raylib\\w64devkit\\bin;${env:PATH}"
+                }
+            }
+        },
+        {
+            "label": "build web",
+            "type": "shell",
+            "command": "mingw32-make",
+            "args": [
+                "web"
+            ],
+            "group": "build",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "options": {
+                "env": {
+                    "PATH": "C:\\raylib\\w64devkit\\bin;${env:PATH}"
+                }
+            }
+        },
+        {
+            "label": "serve web",
+            "type": "shell",
+            "command": "mingw32-make",
+            "args": [
+                "serve"
+            ],
+            "problemMatcher": [],
+            "options": {
+                "env": {
+                    "PATH": "C:\\raylib\\w64devkit\\bin;${env:PATH}"
+                }
+            }
+        },
+        {
+            "label": "run tests",
+            "type": "shell",
+            "command": "mingw32-make",
+            "args": [
+                "test"
+            ],
+            "group": "test",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "options": {
+                "env": {
+                    "PATH": "C:\\raylib\\w64devkit\\bin;${env:PATH}"
+                }
+            }
+        },
+        {
+            "label": "clean",
+            "type": "shell",
+            "command": "mingw32-make",
+            "args": [
+                "clean"
+            ],
+            "problemMatcher": [],
+            "options": {
+                "env": {
+                    "PATH": "C:\\raylib\\w64devkit\\bin;${env:PATH}"
+                }
+            }
+        }
+    ]
+}
